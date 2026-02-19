@@ -16,7 +16,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useGetWorkflowQuery, useUpdateWorkflowMutation, useCreateWorkflowMutation } from '../store/api/workflowApi';
-import { useGetRolesQuery } from '../store/api/roleApi';
+import { useGetRolesForAssignmentQuery } from '../store/api/roleApi';
 import { sampleRestrictions, sampleRules, sampleAttributes } from '../data/workflowSamples';
 import type { WorkflowStep, FormField, BusinessRule, StepType, FieldType } from '../types';
 
@@ -38,7 +38,13 @@ export default function WorkflowDesigner() {
     const navigate = useNavigate();
     const isNew = id === 'new';
     const { data: workflow } = useGetWorkflowQuery(Number(id), { skip: isNew });
-    const { data: roleList } = useGetRolesQuery();
+    const { data: roleList, isLoading: rolesLoading, isError: rolesError, error: rolesErrorDetail } = useGetRolesForAssignmentQuery(undefined, {
+        refetchOnMountOrArgChange: true,
+    });
+
+    if (rolesError) {
+        console.error('[WorkflowDesigner] Failed to load roles:', rolesErrorDetail);
+    }
     const [updateWorkflow] = useUpdateWorkflowMutation();
     const [createWorkflow] = useCreateWorkflowMutation();
 
@@ -417,13 +423,26 @@ export default function WorkflowDesigner() {
                         </div>
                         <div className="form-group">
                             <label className="form-label">Assigned Role</label>
-                            <select className="form-select" value={selectedStep.assignedRoleId || ''} onChange={e => updateStep('assignedRoleId', e.target.value ? Number(e.target.value) : null)}>
+                            {rolesError && (
+                                <p style={{ fontSize: '0.75rem', color: 'var(--danger)', margin: '0 0 4px 0' }}>
+                                    Failed to load roles. Check console for details.
+                                </p>
+                            )}
+                            <select
+                                className="form-select"
+                                value={selectedStep.assignedRoleId ?? ''}
+                                onChange={e => updateStep('assignedRoleId', e.target.value ? Number(e.target.value) : null)}
+                            >
                                 <option value="">None</option>
-                                {roleList?.map(r => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name === 'USER' ? 'User' : r.name === 'ADMIN' ? 'Admin' : r.name}
-                                    </option>
-                                ))}
+                                {rolesLoading ? (
+                                    <option value="" disabled>Loading roles…</option>
+                                ) : (
+                                    (roleList ?? []).map(r => (
+                                        <option key={r.id} value={r.id}>
+                                            {r.name === 'USER' ? 'User' : r.name === 'ADMIN' ? 'Admin' : r.name}
+                                        </option>
+                                    ))
+                                )}
                             </select>
                         </div>
 

@@ -6,17 +6,20 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.util.concurrent.TimeUnit;
 
 @Configuration
+@EnableCaching
 public class CaffeineCacheConfig {
 
     public static final String USER_DETAILS_CACHE = "userDetails";
 
     @Bean("caffeineCacheManager")
+    @Primary
     public CacheManager caffeineCacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager(USER_DETAILS_CACHE);
+        CaffeineCacheManager manager = new CaffeineCacheManager(USER_DETAILS_CACHE, "roles");
         manager.setCaffeine(Caffeine.newBuilder()
                 .expireAfterWrite(5, TimeUnit.MINUTES)
                 .maximumSize(10_000));

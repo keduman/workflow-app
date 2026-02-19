@@ -39,7 +39,7 @@ app:
     refresh-expiration-ms: 86400000
 
   cors:
-    allowed-origins: http://localhost:5173
+    allowed-origins: http://localhost:5173,http://localhost:5174
 
   security:
     h2-console-enabled: true

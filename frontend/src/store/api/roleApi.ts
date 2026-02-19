@@ -11,6 +11,11 @@ export const roleApi = createApi({
             query: () => '/admin/roles',
             providesTags: ['Role'],
         }),
+        /** List roles for workflow step assignment (any authenticated user). */
+        getRolesForAssignment: builder.query<Role[], void>({
+            query: () => '/roles',
+            providesTags: ['Role'],
+        }),
         createRole: builder.mutation<Role, Partial<Role>>({
             query: (body) => ({ url: '/admin/roles', method: 'POST', body }),
             invalidatesTags: ['Role'],
@@ -40,6 +45,7 @@ export const roleApi = createApi({
 
 export const {
     useGetRolesQuery,
+    useGetRolesForAssignmentQuery,
     useCreateRoleMutation,
     useUpdateRoleMutation,
     useDeleteRoleMutation,
