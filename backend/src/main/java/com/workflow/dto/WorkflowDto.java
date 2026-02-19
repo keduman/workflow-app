@@ -4,6 +4,7 @@ import com.workflow.model.WorkflowStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+import java.io.Serializable;
 import java.util.List;
 
 @Getter
@@ -11,7 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkflowDto {
+public class WorkflowDto implements Serializable {
     private Long id;
 
     @NotBlank

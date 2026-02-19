@@ -1,17 +1,10 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../store';
+import { createApi } from '@reduxjs/toolkit/query/react';
 import type { Workflow, Page } from '../../types';
+import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 export const workflowApi = createApi({
     reducerPath: 'workflowApi',
-    baseQuery: fetchBaseQuery({
-        baseUrl: '/api',
-        prepareHeaders: (headers, { getState }) => {
-            const token = (getState() as RootState).auth.accessToken;
-            if (token) headers.set('Authorization', `Bearer ${token}`);
-            return headers;
-        },
-    }),
+    baseQuery: baseQueryWithReauth,
     tagTypes: ['Workflow'],
     endpoints: (builder) => ({
         getWorkflows: builder.query<Page<Workflow>, { page?: number; size?: number }>({

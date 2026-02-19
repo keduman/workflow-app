@@ -1,9 +1,11 @@
 package com.workflow.service;
 
 import com.workflow.dto.WorkflowDto;
+import com.workflow.dto.WorkflowListDto;
 import com.workflow.dto.WorkflowStepDto;
 import com.workflow.dto.FormFieldDto;
 import com.workflow.dto.BusinessRuleDto;
+import com.workflow.exception.BadRequestException;
 import com.workflow.exception.ResourceNotFoundException;
 import com.workflow.model.BusinessRule;
 import com.workflow.model.FieldType;
@@ -41,17 +43,21 @@ public class WorkflowService {
     public WorkflowDto getWorkflow(Long id) {
         Workflow workflow = workflowRepository.findWithStepsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + id));
+        if (workflow.getSteps() != null) {
+            workflow.getSteps().forEach(s -> s.getBusinessRules().size()); // force-init step rules
+        }
+        workflow.getBusinessRules().size(); // force-init legacy workflow-level rules
         return toDto(workflow);
     }
 
     @Transactional(readOnly = true)
-    public Page<WorkflowDto> getAllWorkflows(Pageable pageable) {
-        return workflowRepository.findAll(pageable).map(this::toDto);
+    public Page<WorkflowListDto> getAllWorkflows(Pageable pageable) {
+        return workflowRepository.findAllList(pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<WorkflowDto> getPublishedWorkflows(Pageable pageable) {
-        return workflowRepository.findByStatus(WorkflowStatus.PUBLISHED, pageable).map(this::toDto);
+    public Page<WorkflowListDto> getPublishedWorkflows(Pageable pageable) {
+        return workflowRepository.findByStatusList(WorkflowStatus.PUBLISHED, pageable);
     }
 
     /** Returns workflow details only if published (for users to load form when executing a task). */
@@ -62,6 +68,10 @@ public class WorkflowService {
         if (workflow.getStatus() != WorkflowStatus.PUBLISHED) {
             throw new ResourceNotFoundException("Workflow not found: " + id);
         }
+        if (workflow.getSteps() != null) {
+            workflow.getSteps().forEach(s -> s.getBusinessRules().size()); // force-init step rules
+        }
+        workflow.getBusinessRules().size(); // force-init legacy workflow-level rules
         return toDto(workflow);
     }
 
@@ -85,12 +95,6 @@ public class WorkflowService {
             }
         }
 
-        if (dto.getBusinessRules() != null) {
-            for (BusinessRuleDto ruleDto : dto.getBusinessRules()) {
-                workflow.addBusinessRule(mapRuleFromDto(ruleDto));
-            }
-        }
-
         Workflow saved = workflowRepository.save(workflow);
         return toDto(saved);
     }
@@ -108,7 +112,7 @@ public class WorkflowService {
             workflow.setStatus(dto.getStatus());
         }
 
-        // Update steps: clear and rebuild
+        // Update steps (and their form fields + business rules): clear and rebuild
         if (dto.getSteps() != null) {
             workflow.getSteps().clear();
             for (WorkflowStepDto stepDto : dto.getSteps()) {
@@ -117,18 +121,6 @@ public class WorkflowService {
                     step.setId(stepDto.getId());
                 }
                 workflow.addStep(step);
-            }
-        }
-
-        // Update business rules: clear and rebuild
-        if (dto.getBusinessRules() != null) {
-            workflow.getBusinessRules().clear();
-            for (BusinessRuleDto ruleDto : dto.getBusinessRules()) {
-                BusinessRule rule = mapRuleFromDto(ruleDto);
-                if (ruleDto.getId() != null) {
-                    rule.setId(ruleDto.getId());
-                }
-                workflow.addBusinessRule(rule);
             }
         }
 
@@ -148,8 +140,14 @@ public class WorkflowService {
     @CacheEvict(value = "workflows", key = "#id")
     @Transactional
     public WorkflowDto publishWorkflow(Long id) {
-        Workflow workflow = workflowRepository.findById(id)
+        Workflow workflow = workflowRepository.findWithStepsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + id));
+        if (workflow.getSteps() == null || workflow.getSteps().isEmpty()) {
+            throw new BadRequestException("Workflow must have at least one step before publishing");
+        }
+        if (workflow.getSteps() != null) {
+            workflow.getSteps().forEach(s -> s.getBusinessRules().size());
+        }
         workflow.setStatus(WorkflowStatus.PUBLISHED);
         return toDto(workflowRepository.save(workflow));
     }
@@ -185,16 +183,46 @@ public class WorkflowService {
             }
         }
 
+        if (dto.getBusinessRules() != null) {
+            for (BusinessRuleDto ruleDto : dto.getBusinessRules()) {
+                BusinessRule rule = mapRuleFromDto(ruleDto);
+                if (ruleDto.getId() != null) {
+                    rule.setId(ruleDto.getId());
+                }
+                step.addBusinessRule(rule);
+            }
+        }
+
         return step;
     }
 
     private WorkflowDto toDto(Workflow workflow) {
         List<WorkflowStepDto> stepDtos = workflow.getSteps() != null
-                ? workflow.getSteps().stream().map(this::stepToDto).collect(Collectors.toList())
+                ? workflow.getSteps().stream()
+                    .collect(Collectors.toMap(WorkflowStep::getId, s -> s, (a, b) -> a, java.util.LinkedHashMap::new))
+                    .values().stream()
+                    .map(this::stepToDto)
+                    .collect(Collectors.toList())
                 : new ArrayList<>();
-        List<BusinessRuleDto> ruleDtos = workflow.getBusinessRules() != null
-                ? workflow.getBusinessRules().stream().map(this::ruleToDto).collect(Collectors.toList())
-                : new ArrayList<>();
+        // Aggregate all step-level rules for backward compatibility (workflow.businessRules)
+        List<BusinessRuleDto> ruleDtos = new ArrayList<>();
+        if (workflow.getSteps() != null) {
+            for (WorkflowStep s : workflow.getSteps()) {
+                if (s.getBusinessRules() != null) {
+                    for (BusinessRule r : s.getBusinessRules()) {
+                        ruleDtos.add(ruleToDto(r));
+                    }
+                }
+            }
+        }
+        // Legacy workflow-level rules (no step)
+        if (workflow.getBusinessRules() != null) {
+            for (BusinessRule r : workflow.getBusinessRules()) {
+                if (r.getStep() == null) {
+                    ruleDtos.add(ruleToDto(r));
+                }
+            }
+        }
 
         return WorkflowDto.builder()
                 .id(workflow.getId())
@@ -235,6 +263,9 @@ public class WorkflowService {
         List<FormFieldDto> fieldDtos = step.getFormFields() != null
                 ? step.getFormFields().stream().map(this::fieldToDto).collect(Collectors.toList())
                 : new ArrayList<>();
+        List<BusinessRuleDto> ruleDtos = step.getBusinessRules() != null
+                ? step.getBusinessRules().stream().map(this::ruleToDto).collect(Collectors.toList())
+                : new ArrayList<>();
 
         return WorkflowStepDto.builder()
                 .id(step.getId())
@@ -248,6 +279,7 @@ public class WorkflowService {
                 .positionY(step.getPositionY())
                 .transitionTargets(step.getTransitionTargets())
                 .formFields(fieldDtos)
+                .businessRules(ruleDtos)
                 .build();
     }
 

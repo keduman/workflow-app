@@ -8,6 +8,8 @@ import com.workflow.repository.RoleRepository;
 import com.workflow.repository.UserRepository;
 import com.workflow.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.CacheManager;
 import org.springframework.security.authentication.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,6 +29,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
 
+    @Autowired(required = false)
+    private CacheManager cacheManager;
+
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -37,8 +42,11 @@ public class AuthService {
         }
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseGet(() -> roleRepository
-                        .save(Role.builder().name("USER").description("Default user role").build()));
+                .orElseGet(() -> {
+                    Role created = roleRepository.save(Role.builder().name("USER").description("Default user role").build());
+                    evictRolesCache();
+                    return created;
+                });
 
         User user = User.builder()
                 .username(request.getUsername())
@@ -62,6 +70,7 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
@@ -81,6 +90,7 @@ public class AuthService {
                 .build();
     }
 
+    @Transactional(readOnly = true)
     public AuthResponse refreshToken(String refreshToken) {
         if (!tokenProvider.validateToken(refreshToken)) {
             throw new BadRequestException("Invalid refresh token");
@@ -99,5 +109,14 @@ public class AuthService {
                 .email(user.getEmail())
                 .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
                 .build();
+    }
+
+    private void evictRolesCache() {
+        if (cacheManager != null) {
+            var cache = cacheManager.getCache("roles");
+            if (cache != null) {
+                cache.clear();
+            }
+        }
     }
 }

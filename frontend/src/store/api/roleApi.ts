@@ -1,17 +1,10 @@
-import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
-import type { RootState } from '../store';
+import { createApi } from '@reduxjs/toolkit/query/react';
 import type { Role, User, Page } from '../../types';
+import { baseQueryWithReauth } from './baseQueryWithReauth';
 
 export const roleApi = createApi({
     reducerPath: 'roleApi',
-    baseQuery: fetchBaseQuery({
-        baseUrl: '/api',
-        prepareHeaders: (headers, { getState }) => {
-            const token = (getState() as RootState).auth.accessToken;
-            if (token) headers.set('Authorization', `Bearer ${token}`);
-            return headers;
-        },
-    }),
+    baseQuery: baseQueryWithReauth,
     tagTypes: ['Role', 'User'],
     endpoints: (builder) => ({
         getRoles: builder.query<Role[], void>({

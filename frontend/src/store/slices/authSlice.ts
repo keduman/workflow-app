@@ -1,33 +1,38 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 
-interface AuthState {
+export interface AuthState {
     accessToken: string | null;
     refreshToken: string | null;
     username: string | null;
     email: string | null;
     roles: string[];
     isAuthenticated: boolean;
+    authCheckComplete: boolean;
 }
 
-const stored = localStorage.getItem('auth');
-const initial: AuthState = stored
-    ? JSON.parse(stored)
-    : { accessToken: null, refreshToken: null, username: null, email: null, roles: [], isAuthenticated: false };
+const initial: AuthState = {
+    accessToken: null,
+    refreshToken: null,
+    username: null,
+    email: null,
+    roles: [],
+    isAuthenticated: false,
+    authCheckComplete: false,
+};
 
 const authSlice = createSlice({
     name: 'auth',
     initialState: initial,
     reducers: {
         setCredentials: (state, action: PayloadAction<{
-            accessToken: string; refreshToken: string; username: string; email: string; roles: string[];
+            accessToken: string; refreshToken: string | null; username: string; email: string; roles: string[];
         }>) => {
             state.accessToken = action.payload.accessToken;
-            state.refreshToken = action.payload.refreshToken;
+            state.refreshToken = action.payload.refreshToken ?? null;
             state.username = action.payload.username;
             state.email = action.payload.email;
             state.roles = action.payload.roles;
             state.isAuthenticated = true;
-            localStorage.setItem('auth', JSON.stringify(state));
         },
         logout: (state) => {
             state.accessToken = null;
@@ -36,10 +41,12 @@ const authSlice = createSlice({
             state.email = null;
             state.roles = [];
             state.isAuthenticated = false;
-            localStorage.removeItem('auth');
+        },
+        setAuthCheckComplete: (state) => {
+            state.authCheckComplete = true;
         },
     },
 });
 
-export const { setCredentials, logout } = authSlice.actions;
+export const { setCredentials, logout, setAuthCheckComplete } = authSlice.actions;
 export default authSlice.reducer;

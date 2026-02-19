@@ -58,6 +58,11 @@ public class Workflow implements Serializable {
     public void addStep(WorkflowStep step) {
         steps.add(step);
         step.setWorkflow(this);
+        if (step.getBusinessRules() != null) {
+            for (BusinessRule rule : step.getBusinessRules()) {
+                rule.setWorkflow(this);
+            }
+        }
     }
 
     public void removeStep(WorkflowStep step) {

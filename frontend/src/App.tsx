@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { store } from './store/store';
+import { AuthInit } from './components/AuthInit';
 import { ProtectedRoute, AdminRoute, PublicRoute } from './components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -14,6 +15,7 @@ import TaskExecutionPage from './pages/TaskExecutionPage';
 export default function App() {
   return (
     <Provider store={store}>
+      <AuthInit />
       <BrowserRouter>
         <Routes>
           <Route element={<PublicRoute />}>

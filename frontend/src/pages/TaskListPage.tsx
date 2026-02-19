@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { useGetMyTasksQuery, useGetPublishedWorkflowsQuery, useStartWorkflowMutation, useCancelTaskMutation } from '../store/api/taskApi';
 import { motion } from 'framer-motion';
+import type { RootState } from '../store/store';
 
 export default function TaskListPage() {
     const navigate = useNavigate();
+    const isAdmin = useSelector((s: RootState) => s.auth.roles?.includes('ADMIN'));
     const { data: tasks, isLoading } = useGetMyTasksQuery({ page: 0, size: 50 });
     const { data: workflows } = useGetPublishedWorkflowsQuery({ page: 0, size: 50 });
     const [startWorkflow] = useStartWorkflowMutation();
@@ -33,6 +36,7 @@ export default function TaskListPage() {
                 <div className="modal-overlay" onClick={() => setShowStart(false)}>
                     <motion.div className="modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={e => e.stopPropagation()}>
                         <h3 className="modal-title">Start a Workflow</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: 16 }}>Choose a published workflow to start. To <strong>create</strong> a new workflow, go to <strong>Admin → Workflows → + Create Workflow</strong>.</p>
                         {workflows?.content.length ? (
                             <div style={{ maxHeight: 400, overflowY: 'auto' }}>
                                 {workflows.content.map(wf => (
@@ -40,14 +44,19 @@ export default function TaskListPage() {
                                         <div>
                                             <div style={{ fontWeight: 600 }}>{wf.name}</div>
                                             <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{wf.description || 'No description'}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>{wf.steps?.length || 0} steps</div>
+                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: 4 }}>{wf.stepCount ?? wf.steps?.length ?? 0} steps</div>
                                         </div>
                                         <button className="btn btn-primary btn-sm" onClick={() => handleStart(wf.id!)}>Start</button>
                                     </div>
                                 ))}
                             </div>
                         ) : <div className="empty-state"><p>No published workflows available</p></div>}
-                        <div className="modal-actions">
+                        <div className="modal-actions" style={{ flexWrap: 'wrap', gap: 8 }}>
+                            {isAdmin && (
+                                <button className="btn btn-primary" onClick={() => { setShowStart(false); navigate('/admin/workflows/new'); }}>
+                                    + Create new workflow
+                                </button>
+                            )}
                             <button className="btn btn-secondary" onClick={() => setShowStart(false)}>Close</button>
                         </div>
                     </motion.div>

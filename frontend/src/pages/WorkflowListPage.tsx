@@ -40,7 +40,7 @@ export default function WorkflowListPage() {
                             </div>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.8rem', marginBottom: 16 }}>{wf.description || 'No description'}</p>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                <span>{wf.steps?.length || 0} steps</span>
+                                <span>{wf.stepCount ?? wf.steps?.length ?? 0} steps</span>
                                 <span>by {wf.createdByUsername}</span>
                             </div>
                             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>

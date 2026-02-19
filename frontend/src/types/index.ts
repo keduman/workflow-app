@@ -9,7 +9,7 @@ export interface User {
 
 export interface AuthResponse {
     accessToken: string;
-    refreshToken: string;
+    refreshToken: string | null;
     username: string;
     email: string;
     roles: string[];
@@ -63,6 +63,7 @@ export interface WorkflowStep {
     positionY?: number;
     transitionTargets?: string;
     formFields: FormField[];
+    businessRules?: BusinessRule[];
 }
 
 export interface BusinessRule {
@@ -81,7 +82,9 @@ export interface Workflow {
     description?: string;
     status: WorkflowStatus;
     createdByUsername?: string;
-    steps: WorkflowStep[];
+    steps?: WorkflowStep[];
+    /** Present when returned from list endpoints (WorkflowListDto) */
+    stepCount?: number;
     businessRules?: BusinessRule[];
     createdAt?: string;
 }

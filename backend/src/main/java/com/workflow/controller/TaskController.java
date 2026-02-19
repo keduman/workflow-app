@@ -2,6 +2,7 @@ package com.workflow.controller;
 
 import com.workflow.dto.WorkflowDto;
 import com.workflow.dto.WorkflowInstanceDto;
+import com.workflow.dto.WorkflowListDto;
 import com.workflow.service.TaskService;
 import com.workflow.service.WorkflowService;
 import lombok.RequiredArgsConstructor;
@@ -23,7 +24,7 @@ public class TaskController {
     private final WorkflowService workflowService;
 
     @GetMapping("/workflows")
-    public ResponseEntity<Page<WorkflowDto>> getPublishedWorkflows(@PageableDefault(size = 20) Pageable pageable) {
+    public ResponseEntity<Page<WorkflowListDto>> getPublishedWorkflows(@PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(workflowService.getPublishedWorkflows(pageable));
     }
 
@@ -44,18 +45,18 @@ public class TaskController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<WorkflowInstanceDto> getTask(@PathVariable Long id) {
-        return ResponseEntity.ok(taskService.getTaskById(id));
+    public ResponseEntity<WorkflowInstanceDto> getTask(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(taskService.getTaskById(id, auth.getName()));
     }
 
     @PostMapping("/{id}/submit")
     public ResponseEntity<WorkflowInstanceDto> submitStep(
             @PathVariable Long id, @RequestBody Map<String, Object> formData, Authentication auth) {
-        return ResponseEntity.ok(taskService.submitStep(id, formData.toString(), auth.getName()));
+        return ResponseEntity.ok(taskService.submitStep(id, formData, auth.getName()));
     }
 
     @PostMapping("/{id}/cancel")
-    public ResponseEntity<WorkflowInstanceDto> cancelTask(@PathVariable Long id) {
-        return ResponseEntity.ok(taskService.cancelTask(id));
+    public ResponseEntity<WorkflowInstanceDto> cancelTask(@PathVariable Long id, Authentication auth) {
+        return ResponseEntity.ok(taskService.cancelTask(id, auth.getName()));
     }
 }

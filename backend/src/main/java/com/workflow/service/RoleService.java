@@ -5,10 +5,15 @@ import com.workflow.exception.BadRequestException;
 import com.workflow.exception.ResourceNotFoundException;
 import com.workflow.model.Role;
 import com.workflow.model.User;
+import com.workflow.config.CaffeineCacheConfig;
 import com.workflow.repository.RoleRepository;
 import com.workflow.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.cache.annotation.*;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,13 +25,17 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class RoleService {
 
+    private static final int ROLES_MAX_SIZE = 500;
+
     private final RoleRepository roleRepository;
     private final UserRepository userRepository;
+    @Qualifier("caffeineCacheManager")
+    private final CacheManager cacheManager;
 
     @Cacheable(value = "roles")
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
-        return roleRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return roleRepository.findAll(PageRequest.of(0, ROLES_MAX_SIZE)).stream().map(this::toDto).collect(Collectors.toList());
     }
 
     @Cacheable(value = "roles", key = "#id")
@@ -80,6 +89,7 @@ public class RoleService {
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + roleId));
         user.getRoles().add(role);
         userRepository.save(user);
+        evictUserDetailsCache(user.getUsername());
     }
 
     @Transactional
@@ -88,6 +98,14 @@ public class RoleService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
         user.getRoles().removeIf(r -> r.getId().equals(roleId));
         userRepository.save(user);
+        evictUserDetailsCache(user.getUsername());
+    }
+
+    private void evictUserDetailsCache(String username) {
+        var cache = cacheManager.getCache(CaffeineCacheConfig.USER_DETAILS_CACHE);
+        if (cache != null) {
+            cache.evict(username);
+        }
     }
 
     private RoleDto toDto(Role role) {

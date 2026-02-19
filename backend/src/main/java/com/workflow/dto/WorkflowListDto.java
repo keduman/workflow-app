@@ -1,6 +1,8 @@
 package com.workflow.dto;
 
+import com.workflow.model.WorkflowStatus;
 import lombok.*;
+
 import java.io.Serializable;
 
 @Getter
@@ -8,12 +10,11 @@ import java.io.Serializable;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BusinessRuleDto implements Serializable {
+public class WorkflowListDto implements Serializable {
     private Long id;
     private String name;
     private String description;
-    private String conditionExpression;
-    private String actionType;
-    private Long targetStepId;
-    private Integer ruleOrder;
+    private WorkflowStatus status;
+    private String createdByUsername;
+    private int stepCount;
 }

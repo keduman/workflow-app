@@ -8,11 +8,14 @@ import com.workflow.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +25,7 @@ public class TaskService {
     private final WorkflowRepository workflowRepository;
     private final WorkflowStepRepository stepRepository;
     private final UserRepository userRepository;
+    private final BusinessRuleEvaluator ruleEvaluator;
 
     @Transactional
     public WorkflowInstanceDto startWorkflow(Long workflowId, String username) {
@@ -60,30 +64,57 @@ public class TaskService {
     }
 
     @Transactional(readOnly = true)
-    public WorkflowInstanceDto getTaskById(Long id) {
-        return toDto(instanceRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + id)));
+    public WorkflowInstanceDto getTaskById(Long id, String username) {
+        WorkflowInstance instance = instanceRepository.findByIdWithAssigneeAndInitiator(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + id));
+        ensureCanAccessTask(instance, username);
+        return toDto(instance);
     }
 
     @Transactional
-    public WorkflowInstanceDto submitStep(Long instanceId, String formData, String username) {
-        WorkflowInstance instance = instanceRepository.findById(instanceId)
+    public WorkflowInstanceDto submitStep(Long instanceId, Map<String, Object> formDataMap, String username) {
+        WorkflowInstance instance = instanceRepository.findByIdWithAssigneeAndInitiator(instanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + instanceId));
+        ensureCanAccessTask(instance, username);
 
         if (instance.getStatus() != InstanceStatus.IN_PROGRESS) {
             throw new BadRequestException("Task is not in progress");
         }
 
-        // Append form data
+        Workflow workflow = instance.getWorkflow();
+        if (workflow.getId() != null) {
+            workflow = workflowRepository.findWithStepsById(workflow.getId()).orElse(workflow);
+        }
+
+        WorkflowStep currentStep = instance.getCurrentStep();
+        if (currentStep != null && workflow.getSteps() != null) {
+            WorkflowStep stepWithFields = workflow.getSteps().stream()
+                    .filter(s -> s.getId().equals(currentStep.getId()))
+                    .findFirst()
+                    .orElse(currentStep);
+            // Prefer step-level rules; fall back to workflow-level (legacy)
+            List<BusinessRule> rulesToEvaluate = stepWithFields.getBusinessRules() != null && !stepWithFields.getBusinessRules().isEmpty()
+                    ? stepWithFields.getBusinessRules()
+                    : (workflow.getBusinessRules() != null ? workflow.getBusinessRules() : Collections.emptyList());
+            if (!rulesToEvaluate.isEmpty()) {
+                Map<String, Object> context = ruleEvaluator.buildContext(formDataMap, stepWithFields);
+                String blockMessage = ruleEvaluator.evaluateBlockingRules(rulesToEvaluate, context);
+                if (blockMessage != null) {
+                    throw new BadRequestException(blockMessage);
+                }
+            }
+        }
+
+        // Append form data (store string representation for display)
+        String formDataStr = formDataMap != null ? formDataMap.toString() : "{}";
         String existingData = instance.getFormData();
         if (existingData != null && !existingData.isEmpty()) {
-            instance.setFormData(existingData + "|||" + formData);
+            instance.setFormData(existingData + "|||" + formDataStr);
         } else {
-            instance.setFormData(formData);
+            instance.setFormData(formDataStr);
         }
 
         // Advance to next step
-        WorkflowStep currentStep = instance.getCurrentStep();
         if (currentStep != null) {
             List<WorkflowStep> steps = stepRepository.findByWorkflowIdOrderByStepOrderAsc(
                     instance.getWorkflow().getId());
@@ -116,11 +147,23 @@ public class TaskService {
     }
 
     @Transactional
-    public WorkflowInstanceDto cancelTask(Long instanceId) {
-        WorkflowInstance instance = instanceRepository.findById(instanceId)
+    public WorkflowInstanceDto cancelTask(Long instanceId, String username) {
+        WorkflowInstance instance = instanceRepository.findByIdWithAssigneeAndInitiator(instanceId)
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + instanceId));
+        ensureCanAccessTask(instance, username);
         instance.setStatus(InstanceStatus.CANCELLED);
         return toDto(instanceRepository.save(instance));
+    }
+
+    private void ensureCanAccessTask(WorkflowInstance instance, String username) {
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
+        boolean isAssignee = instance.getAssignee() != null && username.equals(instance.getAssignee().getUsername());
+        boolean isInitiator = instance.getInitiatedBy() != null && username.equals(instance.getInitiatedBy().getUsername());
+        boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
+        if (!isAssignee && !isInitiator && !isAdmin) {
+            throw new AccessDeniedException("Not authorized to access this task");
+        }
     }
 
     private WorkflowInstanceDto toDto(WorkflowInstance instance) {

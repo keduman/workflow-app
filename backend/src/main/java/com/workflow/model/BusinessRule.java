@@ -31,7 +31,7 @@ public class BusinessRule implements Serializable {
     @Column(name = "action_type", length = 100)
     private String actionType;
 
-    /** Optional: step ID this rule applies to (null = workflow-level) */
+    /** Optional: step ID this rule applies to (null = workflow-level) - deprecated, use step relation */
     @Column(name = "target_step_id")
     private Long targetStepId;
 
@@ -40,6 +40,11 @@ public class BusinessRule implements Serializable {
     private Integer ruleOrder = 0;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "workflow_id", nullable = false)
+    @JoinColumn(name = "workflow_id")
     private Workflow workflow;
+
+    /** Step this rule belongs to (step-level rules). When set, rule is evaluated only on that step. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "step_id")
+    private WorkflowStep step;
 }

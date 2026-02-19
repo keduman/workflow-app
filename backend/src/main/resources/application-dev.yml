@@ -41,6 +41,10 @@ app:
   cors:
     allowed-origins: http://localhost:5173
 
+  security:
+    h2-console-enabled: true
+    secure-cookies: false
+
 logging:
   level:
     com.workflow: DEBUG

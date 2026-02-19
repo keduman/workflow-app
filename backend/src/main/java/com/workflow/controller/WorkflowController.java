@@ -1,6 +1,7 @@
 package com.workflow.controller;
 
 import com.workflow.dto.WorkflowDto;
+import com.workflow.dto.WorkflowListDto;
 import com.workflow.service.WorkflowService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +22,7 @@ public class WorkflowController {
     private final WorkflowService workflowService;
 
     @GetMapping
-    public ResponseEntity<Page<WorkflowDto>> getAll(@PageableDefault(size = 20) Pageable pageable) {
+    public ResponseEntity<Page<WorkflowListDto>> getAll(@PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(workflowService.getAllWorkflows(pageable));
     }
 

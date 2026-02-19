@@ -3,6 +3,7 @@ package com.workflow.dto;
 import com.workflow.model.StepType;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
+import java.io.Serializable;
 import java.util.List;
 
 @Getter
@@ -10,7 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkflowStepDto {
+public class WorkflowStepDto implements Serializable {
     private Long id;
 
     @NotBlank
@@ -25,4 +26,5 @@ public class WorkflowStepDto {
     private Double positionY;
     private String transitionTargets;
     private List<FormFieldDto> formFields;
+    private List<BusinessRuleDto> businessRules;
 }

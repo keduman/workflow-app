@@ -4,7 +4,8 @@ import { type RootState } from '../store/store';
 import Sidebar from './Sidebar';
 
 export function ProtectedRoute() {
-    const { isAuthenticated } = useSelector((s: RootState) => s.auth);
+    const { isAuthenticated, authCheckComplete } = useSelector((s: RootState) => s.auth);
+    if (!authCheckComplete) return <div className="loading-container"><div className="spinner" /></div>;
     if (!isAuthenticated) return <Navigate to="/login" replace />;
     return (
         <div className="app-layout">
@@ -23,7 +24,8 @@ export function AdminRoute() {
 }
 
 export function PublicRoute() {
-    const { isAuthenticated } = useSelector((s: RootState) => s.auth);
+    const { isAuthenticated, authCheckComplete } = useSelector((s: RootState) => s.auth);
+    if (!authCheckComplete) return <div className="loading-container"><div className="spinner" /></div>;
     if (isAuthenticated) return <Navigate to="/dashboard" replace />;
     return <Outlet />;
 }

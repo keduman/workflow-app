@@ -13,11 +13,43 @@ export default function RoleManagerPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [newRole, setNewRole] = useState({ name: '', description: '', permissions: '' });
     const [showAssign, setShowAssign] = useState<number | null>(null);
+    const [createError, setCreateError] = useState<string | null>(null);
+    const [creating, setCreating] = useState(false);
 
     const handleCreate = async () => {
-        await createRole({ name: newRole.name, description: newRole.description, permissions: newRole.permissions.split(',').map(s => s.trim()).filter(Boolean) });
-        setNewRole({ name: '', description: '', permissions: '' });
-        setShowCreate(false);
+        setCreateError(null);
+        const name = newRole.name?.trim();
+        if (!name) {
+            setCreateError('Role name is required.');
+            return;
+        }
+        setCreating(true);
+        try {
+            const permissions = newRole.permissions
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+            await createRole({
+                name,
+                description: newRole.description?.trim() || undefined,
+                permissions: permissions.length ? permissions : undefined,
+            }).unwrap();
+            setNewRole({ name: '', description: '', permissions: '' });
+            setShowCreate(false);
+        } catch (e: unknown) {
+            let msg = 'Failed to create role. Please try again.';
+            if (e && typeof e === 'object' && 'data' in e && e.data && typeof e.data === 'object') {
+                const d = e.data as Record<string, unknown>;
+                if (typeof d.message === 'string') msg = d.message;
+                else if (d.errors && typeof d.errors === 'object') {
+                    const errs = Object.values(d.errors as Record<string, string>).filter(Boolean);
+                    if (errs.length) msg = errs.join('. ');
+                }
+            }
+            setCreateError(msg);
+        } finally {
+            setCreating(false);
+        }
     };
 
     if (isLoading) return <div className="loading-container"><div className="spinner" /></div>;
@@ -29,28 +61,53 @@ export default function RoleManagerPage() {
                     <h1 className="page-title">Role Management</h1>
                     <p className="page-subtitle">Create roles and assign them to users</p>
                 </div>
-                <button className="btn btn-primary" onClick={() => setShowCreate(true)}>+ Create Role</button>
+                <button className="btn btn-primary" onClick={() => { setShowCreate(true); setCreateError(null); }}>+ Create Role</button>
             </div>
 
             {showCreate && (
-                <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+                <div className="modal-overlay" onClick={() => !creating && setShowCreate(false)}>
                     <motion.div className="modal" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} onClick={e => e.stopPropagation()}>
                         <h3 className="modal-title">Create New Role</h3>
+                        {createError && (
+                            <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--danger-bg, #fef2f2)', color: 'var(--danger, #b91c1c)', fontSize: '0.9rem' }}>
+                                {createError}
+                            </div>
+                        )}
                         <div className="form-group">
-                            <label className="form-label">Role Name</label>
-                            <input className="form-input" value={newRole.name} onChange={e => setNewRole(r => ({ ...r, name: e.target.value }))} placeholder="MANAGER" />
+                            <label className="form-label">Role Name *</label>
+                            <input
+                                className="form-input"
+                                value={newRole.name}
+                                onChange={e => { setNewRole(r => ({ ...r, name: e.target.value })); setCreateError(null); }}
+                                placeholder="e.g. MANAGER"
+                                disabled={creating}
+                            />
                         </div>
                         <div className="form-group">
                             <label className="form-label">Description</label>
-                            <input className="form-input" value={newRole.description} onChange={e => setNewRole(r => ({ ...r, description: e.target.value }))} placeholder="Department manager" />
+                            <input
+                                className="form-input"
+                                value={newRole.description}
+                                onChange={e => setNewRole(r => ({ ...r, description: e.target.value }))}
+                                placeholder="Department manager"
+                                disabled={creating}
+                            />
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Permissions (comma-separated)</label>
-                            <input className="form-input" value={newRole.permissions} onChange={e => setNewRole(r => ({ ...r, permissions: e.target.value }))} placeholder="READ, WRITE, APPROVE" />
+                            <label className="form-label">Permissions (comma-separated, optional)</label>
+                            <input
+                                className="form-input"
+                                value={newRole.permissions}
+                                onChange={e => setNewRole(r => ({ ...r, permissions: e.target.value }))}
+                                placeholder="READ, WRITE, APPROVE"
+                                disabled={creating}
+                            />
                         </div>
                         <div className="modal-actions">
-                            <button className="btn btn-secondary" onClick={() => setShowCreate(false)}>Cancel</button>
-                            <button className="btn btn-primary" onClick={handleCreate}>Create</button>
+                            <button className="btn btn-secondary" onClick={() => setShowCreate(false)} disabled={creating}>Cancel</button>
+                            <button className="btn btn-primary" onClick={handleCreate} disabled={creating}>
+                                {creating ? 'Creating…' : 'Create'}
+                            </button>
                         </div>
                     </motion.div>
                 </div>

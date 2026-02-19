@@ -1,15 +1,23 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { type RootState } from '../store/store';
+import { type AppDispatch } from '../store/store';
 import { logout } from '../store/slices/authSlice';
+import { useLogoutMutation } from '../store/api/authApi';
 
 export default function Sidebar() {
     const { username, roles } = useSelector((s: RootState) => s.auth);
-    const dispatch = useDispatch();
+    const dispatch = useDispatch<AppDispatch>();
     const navigate = useNavigate();
+    const [logoutApi] = useLogoutMutation();
     const isAdmin = roles.includes('ADMIN');
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await logoutApi().unwrap();
+        } catch {
+            // Proceed to clear local state even if server call fails
+        }
         dispatch(logout());
         navigate('/login');
     };

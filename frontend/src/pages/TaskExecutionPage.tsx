@@ -2,29 +2,43 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGetTaskQuery, useSubmitStepMutation, useGetPublishedWorkflowQuery } from '../store/api/taskApi';
 import { motion } from 'framer-motion';
-import type { FormField } from '../types';
+import DynamicStepForm from '../components/DynamicStepForm';
 
 export default function TaskExecutionPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const { data: task, isLoading } = useGetTaskQuery(Number(id));
     const { data: workflow } = useGetPublishedWorkflowQuery(task?.workflowId ?? 0, { skip: !task?.workflowId });
-    const [submitStep] = useSubmitStepMutation();
+    const [submitStep, { isLoading: submitting }] = useSubmitStepMutation();
     const [formData, setFormData] = useState<Record<string, string>>({});
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
-    const currentStep = workflow?.steps.find(s => s.id === task?.currentStepId);
+    const currentStep = workflow?.steps?.find(s => s.id === task?.currentStepId);
+    const formFields = currentStep?.formFields ?? [];
 
     useEffect(() => {
-        if (currentStep) {
+        setSubmitError(null);
+        if (currentStep && currentStep.formFields) {
             const initial: Record<string, string> = {};
             currentStep.formFields.forEach(f => { initial[f.fieldKey] = ''; });
             setFormData(initial);
         }
     }, [currentStep]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await submitStep({ id: Number(id), formData }).unwrap();
+    const handleSubmit = async () => {
+        setSubmitError(null);
+        try {
+            await submitStep({ id: Number(id), formData }).unwrap();
+        } catch (e: unknown) {
+            const msg = e && typeof e === 'object' && 'data' in e && e.data && typeof e.data === 'object' && 'message' in e.data
+                ? String((e.data as { message: string }).message)
+                : 'Submission failed. Please try again.';
+            setSubmitError(msg);
+        }
+    };
+
+    const handleAdvanceNoFields = () => {
+        submitStep({ id: Number(id), formData: {} });
     };
 
     if (isLoading) return <div className="loading-container"><div className="spinner" /></div>;
@@ -47,13 +61,15 @@ export default function TaskExecutionPage() {
                 </div>
             </div>
 
-            {workflow?.businessRules && workflow.businessRules.length > 0 && task.status === 'IN_PROGRESS' && (
+            {(() => {
+                const rulesToShow = (currentStep?.businessRules?.length ? currentStep.businessRules : workflow?.businessRules) ?? [];
+                return rulesToShow.length > 0 && task.status === 'IN_PROGRESS' && (
                 <div className="card" style={{ marginBottom: 20 }}>
                     <div className="card-header">
-                        <h3 className="card-title">Rules for this workflow</h3>
+                        <h3 className="card-title">Rules for this step</h3>
                     </div>
                     <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-                        {workflow.businessRules.map((rule, idx) => (
+                        {rulesToShow.map((rule, idx) => (
                             <li key={idx} style={{ marginBottom: 6 }}>
                                 <strong style={{ color: 'var(--text-primary)' }}>{rule.name}</strong>
                                 {rule.conditionExpression && <span> — when {rule.conditionExpression}</span>}
@@ -63,10 +79,10 @@ export default function TaskExecutionPage() {
                         ))}
                     </ul>
                 </div>
-            )}
+            ); })()}
 
             {task.status === 'IN_PROGRESS' && currentStep ? (
-                <motion.div className="card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                <motion.div className="card card-step-form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
                     <div className="card-header">
                         <div>
                             <h3 className="card-title">{currentStep.name}</h3>
@@ -75,62 +91,31 @@ export default function TaskExecutionPage() {
                         <span className={`badge badge-${currentStep.type.toLowerCase()}`}>{currentStep.type}</span>
                     </div>
 
-                    {currentStep.formFields.length > 0 ? (
-                        <form onSubmit={handleSubmit}>
-                            {currentStep.formFields.map((field: FormField, idx: number) => (
-                                <motion.div key={idx} className="form-group" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}>
-                                    <label className="form-label">
-                                        {field.label} {field.required && <span style={{ color: 'var(--danger)' }}>*</span>}
-                                    </label>
-                                    {field.fieldType === 'TEXT' || field.fieldType === 'EMAIL' || field.fieldType === 'NUMBER' || field.fieldType === 'DATE' ? (
-                                        <input
-                                            className="form-input"
-                                            type={field.fieldType === 'NUMBER' ? 'number' : field.fieldType === 'EMAIL' ? 'email' : field.fieldType === 'DATE' ? 'date' : 'text'}
-                                            value={formData[field.fieldKey] || ''}
-                                            onChange={e => setFormData(d => ({ ...d, [field.fieldKey]: e.target.value }))}
-                                            placeholder={field.placeholder || ''}
-                                            required={field.required}
-                                        />
-                                    ) : field.fieldType === 'TEXTAREA' ? (
-                                        <textarea
-                                            className="form-textarea"
-                                            value={formData[field.fieldKey] || ''}
-                                            onChange={e => setFormData(d => ({ ...d, [field.fieldKey]: e.target.value }))}
-                                            placeholder={field.placeholder || ''}
-                                            required={field.required}
-                                        />
-                                    ) : field.fieldType === 'SELECT' ? (
-                                        <select
-                                            className="form-select"
-                                            value={formData[field.fieldKey] || ''}
-                                            onChange={e => setFormData(d => ({ ...d, [field.fieldKey]: e.target.value }))}
-                                            required={field.required}
-                                        >
-                                            <option value="">Select...</option>
-                                            {field.options?.split(',').map(o => <option key={o.trim()} value={o.trim()}>{o.trim()}</option>)}
-                                        </select>
-                                    ) : field.fieldType === 'CHECKBOX' ? (
-                                        <label className="form-checkbox-group">
-                                            <input type="checkbox" className="form-checkbox" checked={formData[field.fieldKey] === 'true'} onChange={e => setFormData(d => ({ ...d, [field.fieldKey]: String(e.target.checked) }))} />
-                                            <span>{field.placeholder || field.label}</span>
-                                        </label>
-                                    ) : (
-                                        <input
-                                            className="form-input"
-                                            value={formData[field.fieldKey] || ''}
-                                            onChange={e => setFormData(d => ({ ...d, [field.fieldKey]: e.target.value }))}
-                                            placeholder={field.placeholder || ''}
-                                            required={field.required}
-                                        />
-                                    )}
-                                </motion.div>
-                            ))}
-                            <button className="btn btn-primary" type="submit" style={{ marginTop: 8 }}>Submit & Advance</button>
-                        </form>
+                    {formFields.length > 0 ? (
+                        <div className="step-form-wrapper">
+                            {submitError && (
+                                <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: 'var(--danger-bg, #fef2f2)', color: 'var(--danger, #b91c1c)', fontSize: '0.9rem' }}>
+                                    {submitError}
+                                </div>
+                            )}
+                            <p className="step-form-intro">
+                                Fill in the attributes below. These fields were defined by the workflow admin for this step.
+                            </p>
+                            <DynamicStepForm
+                                formFields={formFields}
+                                formData={formData}
+                                onChange={setFormData}
+                                onSubmit={handleSubmit}
+                                submitLabel="Submit & Advance"
+                                submitting={submitting}
+                            />
+                        </div>
                     ) : (
-                        <div>
+                        <div className="step-form-wrapper">
                             <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>No form fields for this step. Click to advance.</p>
-                            <button className="btn btn-primary" onClick={() => submitStep({ id: Number(id), formData: {} })}>Advance to Next Step</button>
+                            <button className="btn btn-primary" onClick={handleAdvanceNoFields} disabled={submitting}>
+                                {submitting ? 'Advancing…' : 'Advance to Next Step'}
+                            </button>
                         </div>
                     )}
                 </motion.div>

@@ -46,6 +46,13 @@ public class DataSeeder implements CommandLineRunner {
             }
         }
 
+        // Always ensure USER role exists (e.g. for "Assigned Role" dropdown in workflow designer)
+        if (roleRepository.findByName("USER").isEmpty()) {
+            roleRepository.save(
+                    Role.builder().name("USER").description("Default user").permissions(Set.of("READ", "EXECUTE")).build());
+            log.info("Seeded missing USER role");
+        }
+
         // Seed a regular user (USER role only) if not present
         roleRepository.findByName("USER").ifPresent(userRole -> {
             if (!userRepository.existsByUsername("user")) {
@@ -93,6 +100,21 @@ public class DataSeeder implements CommandLineRunner {
         stepSubmit.addFormField(FormField.builder().label("Title").fieldKey("title").fieldType(FieldType.TEXT).required(true).placeholder("e.g. Office supplies").fieldOrder(0).build());
         stepSubmit.addFormField(FormField.builder().label("Amount").fieldKey("amount").fieldType(FieldType.NUMBER).required(true).placeholder("0").fieldOrder(1).build());
         stepSubmit.addFormField(FormField.builder().label("Description").fieldKey("description").fieldType(FieldType.TEXTAREA).required(false).placeholder("Optional details").fieldOrder(2).build());
+        // Step-level business rules (evaluated when submitting this step)
+        stepSubmit.addBusinessRule(BusinessRule.builder()
+                .name("High value")
+                .description("When amount is over 1000, require approval.")
+                .conditionExpression("amount > 1000")
+                .actionType("REQUIRE_APPROVAL")
+                .ruleOrder(0)
+                .build());
+        stepSubmit.addBusinessRule(BusinessRule.builder()
+                .name("Low value")
+                .description("When amount is 1000 or less, auto-approve.")
+                .conditionExpression("amount <= 1000")
+                .actionType("AUTO_APPROVE")
+                .ruleOrder(1)
+                .build());
         workflow.addStep(stepSubmit);
 
         // Step 1: END (Done)
@@ -105,25 +127,6 @@ public class DataSeeder implements CommandLineRunner {
                 .build();
         workflow.addStep(stepEnd);
 
-        workflow = workflowRepository.save(workflow);
-
-        // (Transition targets optional — task engine advances by step order.)
-
-        // Business rules
-        workflow.addBusinessRule(BusinessRule.builder()
-                .name("High value")
-                .description("When amount is over 1000, require approval.")
-                .conditionExpression("amount > 1000")
-                .actionType("REQUIRE_APPROVAL")
-                .ruleOrder(0)
-                .build());
-        workflow.addBusinessRule(BusinessRule.builder()
-                .name("Low value")
-                .description("When amount is 1000 or less, auto-approve.")
-                .conditionExpression("amount <= 1000")
-                .actionType("AUTO_APPROVE")
-                .ruleOrder(1)
-                .build());
         workflow = workflowRepository.save(workflow);
 
         workflow.setStatus(WorkflowStatus.PUBLISHED);

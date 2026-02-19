@@ -45,3 +45,9 @@ app:
 
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
+
+  # Set to true only in dev profile (application-dev.yml). Never enable in production.
+  security:
+    h2-console-enabled: false
+    # Set to true in production so refresh token cookie is Secure (HTTPS only).
+    secure-cookies: false
