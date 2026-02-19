@@ -6,6 +6,7 @@
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/SecurityConfig.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/AuthController.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/RoleController.java
+/home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/RolesListController.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/TaskController.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/UserController.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/controller/WorkflowController.java

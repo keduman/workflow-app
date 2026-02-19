@@ -1,4 +1,5 @@
 com/workflow/config/CaffeineCacheConfig.class
+com/workflow/controller/RolesListController.class
 com/workflow/dto/WorkflowListDto.class
 com/workflow/dto/RefreshRequest$RefreshRequestBuilder.class
 com/workflow/dto/RefreshRequest.class
