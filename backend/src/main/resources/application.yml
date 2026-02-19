@@ -1,0 +1,47 @@
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,text/html,text/plain
+
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:workflow_db}
+    username: ${DB_USER:workflow}
+    password: ${DB_PASS:workflow123}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 20
+        jdbc:
+          batch_size: 25
+        order_inserts: true
+        order_updates: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:c2VjdXJlLWp3dC1zZWNyZXQta2V5LWZvci13b3JrZmxvdy1lbmdpbmUtYXBwbGljYXRpb24tMjAyNA==}
+    access-expiration-ms: 900000
+    refresh-expiration-ms: 86400000
+
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:5173}
