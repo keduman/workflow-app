@@ -1,5 +1,7 @@
 package com.workflow.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.workflow.dto.WorkflowInstanceDto;
 import com.workflow.exception.BadRequestException;
 import com.workflow.exception.ResourceNotFoundException;
@@ -16,16 +18,20 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 @Service
 @RequiredArgsConstructor
 public class TaskService {
+
+    private static final int MAX_FORM_DATA_LENGTH = 50_000;
 
     private final WorkflowInstanceRepository instanceRepository;
     private final WorkflowRepository workflowRepository;
     private final WorkflowStepRepository stepRepository;
     private final UserRepository userRepository;
     private final BusinessRuleEvaluator ruleEvaluator;
+    private final ObjectMapper objectMapper;
 
     @Transactional
     public WorkflowInstanceDto startWorkflow(Long workflowId, String username) {
@@ -105,13 +111,17 @@ public class TaskService {
             }
         }
 
-        // Append form data (store string representation for display)
-        String formDataStr = formDataMap != null ? formDataMap.toString() : "{}";
+        // Serialize form data as JSON
+        String formDataJson = serializeFormData(formDataMap);
         String existingData = instance.getFormData();
         if (existingData != null && !existingData.isEmpty()) {
-            instance.setFormData(existingData + "|||" + formDataStr);
+            String combined = existingData + "|||" + formDataJson;
+            if (combined.length() > MAX_FORM_DATA_LENGTH) {
+                throw new BadRequestException("Accumulated form data exceeds maximum allowed size");
+            }
+            instance.setFormData(combined);
         } else {
-            instance.setFormData(formDataStr);
+            instance.setFormData(formDataJson);
         }
 
         // Advance to next step
@@ -119,19 +129,15 @@ public class TaskService {
             List<WorkflowStep> steps = stepRepository.findByWorkflowIdOrderByStepOrderAsc(
                     instance.getWorkflow().getId());
 
-            int currentIndex = -1;
-            for (int i = 0; i < steps.size(); i++) {
-                if (steps.get(i).getId().equals(currentStep.getId())) {
-                    currentIndex = i;
-                    break;
-                }
-            }
+            int currentIndex = IntStream.range(0, steps.size())
+                    .filter(i -> steps.get(i).getId().equals(currentStep.getId()))
+                    .findFirst()
+                    .orElse(-1);
 
             if (currentIndex >= 0 && currentIndex < steps.size() - 1) {
                 WorkflowStep nextStep = steps.get(currentIndex + 1);
                 instance.setCurrentStep(nextStep);
 
-                // If next step has a role, try to keep same assignee or auto-assign
                 if (nextStep.getType() == StepType.END) {
                     instance.setStatus(InstanceStatus.COMPLETED);
                     instance.setCompletedAt(LocalDateTime.now());
@@ -155,30 +161,49 @@ public class TaskService {
         return toDto(instanceRepository.save(instance));
     }
 
+    private String serializeFormData(Map<String, Object> formDataMap) {
+        if (formDataMap == null || formDataMap.isEmpty()) {
+            return "{}";
+        }
+        try {
+            return objectMapper.writeValueAsString(formDataMap);
+        } catch (JsonProcessingException e) {
+            throw new BadRequestException("Invalid form data format");
+        }
+    }
+
+    /**
+     * Check access using the already-fetched assignee/initiator on the instance,
+     * only hitting the DB for the current user when the fast checks fail (admin check).
+     */
     private void ensureCanAccessTask(WorkflowInstance instance, String username) {
-        User currentUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new AccessDeniedException("User not found"));
         boolean isAssignee = instance.getAssignee() != null && username.equals(instance.getAssignee().getUsername());
         boolean isInitiator = instance.getInitiatedBy() != null && username.equals(instance.getInitiatedBy().getUsername());
+        if (isAssignee || isInitiator) {
+            return;
+        }
+        // Only query DB if we need to check admin role
+        User currentUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new AccessDeniedException("User not found"));
         boolean isAdmin = currentUser.getRoles().stream().anyMatch(r -> "ADMIN".equalsIgnoreCase(r.getName()));
-        if (!isAssignee && !isInitiator && !isAdmin) {
+        if (!isAdmin) {
             throw new AccessDeniedException("Not authorized to access this task");
         }
     }
 
     private WorkflowInstanceDto toDto(WorkflowInstance instance) {
-        return WorkflowInstanceDto.builder()
-                .id(instance.getId())
-                .workflowId(instance.getWorkflow().getId())
-                .workflowName(instance.getWorkflow().getName())
-                .currentStepId(instance.getCurrentStep() != null ? instance.getCurrentStep().getId() : null)
-                .currentStepName(instance.getCurrentStep() != null ? instance.getCurrentStep().getName() : null)
-                .assigneeUsername(instance.getAssignee() != null ? instance.getAssignee().getUsername() : null)
-                .initiatedByUsername(instance.getInitiatedBy() != null ? instance.getInitiatedBy().getUsername() : null)
-                .status(instance.getStatus())
-                .formData(instance.getFormData())
-                .createdAt(instance.getCreatedAt() != null ? instance.getCreatedAt().toString() : null)
-                .completedAt(instance.getCompletedAt() != null ? instance.getCompletedAt().toString() : null)
-                .build();
+        return new WorkflowInstanceDto(
+                instance.getId(),
+                instance.getWorkflow().getId(),
+                instance.getWorkflow().getName(),
+                instance.getCurrentStep() != null ? instance.getCurrentStep().getId() : null,
+                instance.getCurrentStep() != null ? instance.getCurrentStep().getName() : null,
+                instance.getAssignee() != null ? instance.getAssignee().getUsername() : null,
+                instance.getInitiatedBy() != null ? instance.getInitiatedBy().getUsername() : null,
+                instance.getStatus(),
+                instance.getFormData(),
+                instance.getCreatedAt() != null ? instance.getCreatedAt().toString() : null,
+                instance.getCompletedAt() != null ? instance.getCompletedAt().toString() : null
+        );
     }
 }

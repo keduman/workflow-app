@@ -2,16 +2,19 @@ package com.workflow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
+
+import java.util.Objects;
 
 @Entity
-@Table(name = "form_fields")
+@Table(name = "form_fields", indexes = {
+        @Index(name = "idx_field_step", columnList = "step_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class FormField implements Serializable {
+public class FormField {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -47,4 +50,16 @@ public class FormField implements Serializable {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "step_id", nullable = false)
     private WorkflowStep step;
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof FormField other)) return false;
+        return id != null && id.equals(other.id);
+    }
+
+    @Override
+    public int hashCode() {
+        return getClass().hashCode();
+    }
 }

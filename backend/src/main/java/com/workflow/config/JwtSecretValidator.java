@@ -1,6 +1,5 @@
 package com.workflow.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.annotation.Profile;
@@ -15,11 +14,15 @@ public class JwtSecretValidator implements ApplicationRunner {
 
     private static final String DEFAULT_SECRET_B64 = "c2VjdXJlLWp3dC1zZWNyZXQta2V5LWZvci13b3JrZmxvdy1lbmdpbmUtYXBwbGljYXRpb24tMjAyNA==";
 
-    @Value("${app.jwt.secret}")
-    private String secret;
+    private final JwtProperties jwtProperties;
+
+    public JwtSecretValidator(JwtProperties jwtProperties) {
+        this.jwtProperties = jwtProperties;
+    }
 
     @Override
     public void run(ApplicationArguments args) {
+        String secret = jwtProperties.secret();
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException("JWT_SECRET must be set in production. Set the app.jwt.secret property or JWT_SECRET environment variable.");
         }

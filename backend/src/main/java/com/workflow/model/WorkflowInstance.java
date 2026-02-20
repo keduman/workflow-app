@@ -2,17 +2,23 @@ package com.workflow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "workflow_instances")
+@Table(name = "workflow_instances", indexes = {
+        @Index(name = "idx_instance_workflow", columnList = "workflow_id"),
+        @Index(name = "idx_instance_assignee", columnList = "assignee_id"),
+        @Index(name = "idx_instance_initiator", columnList = "initiated_by"),
+        @Index(name = "idx_instance_status", columnList = "status")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkflowInstance implements Serializable {
+public class WorkflowInstance {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,8 +48,8 @@ public class WorkflowInstance implements Serializable {
     @Column(columnDefinition = "TEXT")
     private String formData; // JSON string of submitted form data
 
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 
     private LocalDateTime completedAt;
 }

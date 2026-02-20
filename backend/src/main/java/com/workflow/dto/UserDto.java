@@ -1,17 +1,12 @@
 package com.workflow.dto;
 
-import lombok.*;
+import java.util.Set;
 
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class UserDto {
-    private Long id;
-    private String username;
-    private String email;
-    private String fullName;
-    private boolean enabled;
-    private java.util.Set<String> roles;
-}
+public record UserDto(
+    Long id,
+    String username,
+    String email,
+    String fullName,
+    boolean enabled,
+    Set<String> roles
+) {}

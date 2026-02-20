@@ -48,4 +48,3 @@ app:
 logging:
   level:
     com.workflow: DEBUG
-    org.springframework.security: DEBUG

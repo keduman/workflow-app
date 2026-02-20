@@ -72,7 +72,7 @@ public class DataSeeder implements CommandLineRunner {
     }
 
     private void seedSampleWorkflow() {
-        if (workflowRepository.findAll().stream().anyMatch(w -> SAMPLE_WORKFLOW_NAME.equals(w.getName()))) {
+        if (workflowRepository.existsByName(SAMPLE_WORKFLOW_NAME)) {
             return;
         }
         User admin = userRepository.findByUsername("admin").orElse(null);

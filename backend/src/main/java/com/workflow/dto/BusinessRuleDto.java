@@ -1,19 +1,11 @@
 package com.workflow.dto;
 
-import lombok.*;
-import java.io.Serializable;
-
-@Getter
-@Setter
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class BusinessRuleDto implements Serializable {
-    private Long id;
-    private String name;
-    private String description;
-    private String conditionExpression;
-    private String actionType;
-    private Long targetStepId;
-    private Integer ruleOrder;
-}
+public record BusinessRuleDto(
+    Long id,
+    String name,
+    String description,
+    String conditionExpression,
+    String actionType,
+    Long targetStepId,
+    Integer ruleOrder
+) {}

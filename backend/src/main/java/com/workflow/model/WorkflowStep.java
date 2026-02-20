@@ -2,20 +2,24 @@ package com.workflow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
+import org.hibernate.annotations.BatchSize;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 @Entity
-@Table(name = "workflow_steps")
+@Table(name = "workflow_steps", indexes = {
+        @Index(name = "idx_step_workflow", columnList = "workflow_id"),
+        @Index(name = "idx_step_order", columnList = "workflow_id, step_order")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class WorkflowStep implements Serializable {
+public class WorkflowStep {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -46,6 +50,7 @@ public class WorkflowStep implements Serializable {
 
     @OneToMany(mappedBy = "step", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ruleOrder ASC")
+    @BatchSize(size = 20)
     @Builder.Default
     private List<BusinessRule> businessRules = new ArrayList<>();
 

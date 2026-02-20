@@ -15,7 +15,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,13 +26,13 @@ public class RoleService {
     @Cacheable(value = "roles")
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRoles() {
-        return roleRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return roleRepository.findAll().stream().map(this::toDto).toList();
     }
 
     /** Uncached list for assignment dropdowns; avoids cache manager issues in all profiles. */
     @Transactional(readOnly = true)
     public List<RoleDto> getAllRolesUncached() {
-        return roleRepository.findAll().stream().map(this::toDto).collect(Collectors.toList());
+        return roleRepository.findAll().stream().map(this::toDto).toList();
     }
 
     @Cacheable(value = "roles", key = "#id")
@@ -46,13 +45,13 @@ public class RoleService {
     @CacheEvict(value = "roles", allEntries = true)
     @Transactional
     public RoleDto createRole(RoleDto dto) {
-        if (roleRepository.existsByName(dto.getName())) {
-            throw new BadRequestException("Role already exists: " + dto.getName());
+        if (roleRepository.existsByName(dto.name())) {
+            throw new BadRequestException("Role already exists: " + dto.name());
         }
         Role role = Role.builder()
-                .name(dto.getName())
-                .description(dto.getDescription())
-                .permissions(dto.getPermissions() != null ? dto.getPermissions() : Set.of())
+                .name(dto.name())
+                .description(dto.description())
+                .permissions(dto.permissions() != null ? dto.permissions() : Set.of())
                 .build();
         return toDto(roleRepository.save(role));
     }
@@ -62,10 +61,10 @@ public class RoleService {
     public RoleDto updateRole(Long id, RoleDto dto) {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found: " + id));
-        role.setName(dto.getName());
-        role.setDescription(dto.getDescription());
-        if (dto.getPermissions() != null) {
-            role.setPermissions(dto.getPermissions());
+        role.setName(dto.name());
+        role.setDescription(dto.description());
+        if (dto.permissions() != null) {
+            role.setPermissions(dto.permissions());
         }
         return toDto(roleRepository.save(role));
     }
@@ -98,11 +97,11 @@ public class RoleService {
     }
 
     private RoleDto toDto(Role role) {
-        return RoleDto.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .description(role.getDescription())
-                .permissions(role.getPermissions())
-                .build();
+        return new RoleDto(
+                role.getId(),
+                role.getName(),
+                role.getDescription(),
+                role.getPermissions()
+        );
     }
 }

@@ -13,24 +13,32 @@ import java.util.Optional;
 
 public interface WorkflowRepository extends JpaRepository<Workflow, Long> {
 
-    @Query("SELECT DISTINCT w FROM Workflow w " +
-           "LEFT JOIN FETCH w.steps s " +
-           "LEFT JOIN FETCH s.formFields " +
-           "LEFT JOIN FETCH s.assignedRole " +
-           "WHERE w.id = :id")
+    @Query("""
+            SELECT DISTINCT w FROM Workflow w
+            LEFT JOIN FETCH w.steps s
+            LEFT JOIN FETCH s.formFields
+            LEFT JOIN FETCH s.assignedRole
+            WHERE w.id = :id
+            """)
     Optional<Workflow> findWithStepsById(@Param("id") Long id);
+
+    boolean existsByName(String name);
 
     Page<Workflow> findByStatus(WorkflowStatus status, Pageable pageable);
 
     Page<Workflow> findByCreatedById(Long userId, Pageable pageable);
 
-    @Query(value = "SELECT new com.workflow.dto.WorkflowListDto(w.id, w.name, w.description, w.status, u.username, size(w.steps)) " +
-           "FROM Workflow w LEFT JOIN w.createdBy u",
+    @Query(value = """
+            SELECT new com.workflow.dto.WorkflowListDto(w.id, w.name, w.description, w.status, u.username, size(w.steps))
+            FROM Workflow w LEFT JOIN w.createdBy u
+            """,
            countQuery = "SELECT count(w) FROM Workflow w")
     Page<WorkflowListDto> findAllList(Pageable pageable);
 
-    @Query(value = "SELECT new com.workflow.dto.WorkflowListDto(w.id, w.name, w.description, w.status, u.username, size(w.steps)) " +
-           "FROM Workflow w LEFT JOIN w.createdBy u WHERE w.status = :status",
+    @Query(value = """
+            SELECT new com.workflow.dto.WorkflowListDto(w.id, w.name, w.description, w.status, u.username, size(w.steps))
+            FROM Workflow w LEFT JOIN w.createdBy u WHERE w.status = :status
+            """,
            countQuery = "SELECT count(w) FROM Workflow w WHERE w.status = :status")
     Page<WorkflowListDto> findByStatusList(@Param("status") WorkflowStatus status, Pageable pageable);
 }

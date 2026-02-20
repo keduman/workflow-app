@@ -2,16 +2,18 @@ package com.workflow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
 
 @Entity
-@Table(name = "business_rules")
+@Table(name = "business_rules", indexes = {
+        @Index(name = "idx_rule_workflow", columnList = "workflow_id"),
+        @Index(name = "idx_rule_step", columnList = "step_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class BusinessRule implements Serializable {
+public class BusinessRule {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

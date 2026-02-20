@@ -1,5 +1,7 @@
 package com.workflow.controller;
 
+import com.workflow.config.AppSecurityProperties;
+import com.workflow.config.JwtProperties;
 import com.workflow.dto.*;
 import com.workflow.service.AuthService;
 import jakarta.servlet.http.Cookie;
@@ -7,7 +9,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,24 +22,20 @@ public class AuthController {
     private static final String REFRESH_TOKEN_COOKIE = "refreshToken";
 
     private final AuthService authService;
-
-    @Value("${app.jwt.refresh-expiration-ms:86400000}")
-    private long refreshExpirationMs;
-
-    @Value("${app.security.secure-cookies:false}")
-    private boolean secureCookies;
+    private final JwtProperties jwtProperties;
+    private final AppSecurityProperties securityProperties;
 
     @PostMapping("/register")
     public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletResponse response) {
         AuthResponse authResponse = authService.register(request);
-        setRefreshTokenCookie(response, authResponse.getRefreshToken());
+        setRefreshTokenCookie(response, authResponse.refreshToken());
         return ResponseEntity.ok(withoutRefreshTokenInBody(authResponse));
     }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request, HttpServletResponse response) {
         AuthResponse authResponse = authService.login(request);
-        setRefreshTokenCookie(response, authResponse.getRefreshToken());
+        setRefreshTokenCookie(response, authResponse.refreshToken());
         return ResponseEntity.ok(withoutRefreshTokenInBody(authResponse));
     }
 
@@ -54,14 +51,14 @@ public class AuthController {
             HttpServletRequest request,
             HttpServletResponse response) {
         String token = getRefreshTokenFromCookie(request);
-        if (token == null && body != null && body.getRefreshToken() != null) {
-            token = body.getRefreshToken();
+        if (token == null && body != null && body.refreshToken() != null) {
+            token = body.refreshToken();
         }
         if (token == null || token.isBlank()) {
             throw new com.workflow.exception.BadRequestException("Refresh token is required (cookie or body)");
         }
         AuthResponse authResponse = authService.refreshToken(token);
-        setRefreshTokenCookie(response, authResponse.getRefreshToken());
+        setRefreshTokenCookie(response, authResponse.refreshToken());
         return ResponseEntity.ok(withoutRefreshTokenInBody(authResponse));
     }
 
@@ -78,9 +75,9 @@ public class AuthController {
     private void setRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, refreshToken);
         cookie.setHttpOnly(true);
-        cookie.setSecure(secureCookies);
+        cookie.setSecure(securityProperties.secureCookies());
         cookie.setPath("/");
-        cookie.setMaxAge((int) (refreshExpirationMs / 1000));
+        cookie.setMaxAge((int) (jwtProperties.refreshExpirationMs() / 1000));
         cookie.setAttribute("SameSite", "Lax");
         response.addCookie(cookie);
     }
@@ -88,7 +85,7 @@ public class AuthController {
     private void clearRefreshTokenCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie(REFRESH_TOKEN_COOKIE, "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(secureCookies);
+        cookie.setSecure(securityProperties.secureCookies());
         cookie.setPath("/");
         cookie.setMaxAge(0);
         cookie.setAttribute("SameSite", "Lax");
@@ -96,12 +93,12 @@ public class AuthController {
     }
 
     private AuthResponse withoutRefreshTokenInBody(AuthResponse authResponse) {
-        return AuthResponse.builder()
-                .accessToken(authResponse.getAccessToken())
-                .refreshToken(null)
-                .username(authResponse.getUsername())
-                .email(authResponse.getEmail())
-                .roles(authResponse.getRoles())
-                .build();
+        return new AuthResponse(
+                authResponse.accessToken(),
+                null,
+                authResponse.username(),
+                authResponse.email(),
+                authResponse.roles()
+        );
     }
 }

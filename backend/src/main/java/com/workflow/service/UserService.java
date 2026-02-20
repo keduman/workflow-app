@@ -39,13 +39,13 @@ public class UserService {
     }
 
     private UserDto toDto(User user) {
-        return UserDto.builder()
-                .id(user.getId())
-                .username(user.getUsername())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .enabled(user.isEnabled())
-                .roles(user.getRoles().stream().map(Role::getName).collect(Collectors.toSet()))
-                .build();
+        return new UserDto(
+                user.getId(),
+                user.getUsername(),
+                user.getEmail(),
+                user.getFullName(),
+                user.isEnabled(),
+                user.getRoles().stream().map(Role::getName).collect(Collectors.toUnmodifiableSet())
+        );
     }
 }

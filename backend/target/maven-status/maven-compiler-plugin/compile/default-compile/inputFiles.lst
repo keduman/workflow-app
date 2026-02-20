@@ -1,6 +1,9 @@
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/WorkflowApplication.java
+/home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/AppSecurityProperties.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/CaffeineCacheConfig.java
+/home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/CorsProperties.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/DataSeeder.java
+/home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/JwtProperties.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/JwtSecretValidator.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/RedisConfig.java
 /home/kerim/repositories/workflow-app/backend/src/main/java/com/workflow/config/SecurityConfig.java

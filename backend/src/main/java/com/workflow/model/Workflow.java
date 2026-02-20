@@ -2,19 +2,25 @@ package com.workflow.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.io.Serializable;
+import org.hibernate.annotations.BatchSize;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "workflows")
+@Table(name = "workflows", indexes = {
+        @Index(name = "idx_workflow_status", columnList = "status"),
+        @Index(name = "idx_workflow_created_by", columnList = "created_by")
+})
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Workflow implements Serializable {
+public class Workflow {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,18 +48,15 @@ public class Workflow implements Serializable {
 
     @OneToMany(mappedBy = "workflow", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("ruleOrder ASC")
+    @BatchSize(size = 20)
     @Builder.Default
     private List<BusinessRule> businessRules = new ArrayList<>();
 
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 
+    @UpdateTimestamp
     private LocalDateTime updatedAt;
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
 
     public void addStep(WorkflowStep step) {
         steps.add(step);

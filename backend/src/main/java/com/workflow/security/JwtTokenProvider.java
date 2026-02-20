@@ -1,8 +1,8 @@
 package com.workflow.security;
 
+import com.workflow.config.JwtProperties;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -18,13 +18,10 @@ public class JwtTokenProvider {
     private final long accessExpirationMs;
     private final long refreshExpirationMs;
 
-    public JwtTokenProvider(
-            @Value("${app.jwt.secret}") String secret,
-            @Value("${app.jwt.access-expiration-ms}") long accessExpirationMs,
-            @Value("${app.jwt.refresh-expiration-ms}") long refreshExpirationMs) {
-        this.key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret));
-        this.accessExpirationMs = accessExpirationMs;
-        this.refreshExpirationMs = refreshExpirationMs;
+    public JwtTokenProvider(JwtProperties jwtProperties) {
+        this.key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(jwtProperties.secret()));
+        this.accessExpirationMs = jwtProperties.accessExpirationMs();
+        this.refreshExpirationMs = jwtProperties.refreshExpirationMs();
     }
 
     public String generateAccessToken(Authentication authentication) {

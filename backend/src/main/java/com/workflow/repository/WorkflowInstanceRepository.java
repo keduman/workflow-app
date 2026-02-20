@@ -19,11 +19,13 @@ public interface WorkflowInstanceRepository extends JpaRepository<WorkflowInstan
 
     Page<WorkflowInstance> findByInitiatedById(Long userId, Pageable pageable);
 
-    @Query("SELECT i FROM WorkflowInstance i " +
-           "LEFT JOIN FETCH i.workflow " +
-           "LEFT JOIN FETCH i.currentStep " +
-           "LEFT JOIN FETCH i.assignee " +
-           "LEFT JOIN FETCH i.initiatedBy " +
-           "WHERE i.id = :id")
+    @Query("""
+            SELECT i FROM WorkflowInstance i
+            LEFT JOIN FETCH i.workflow
+            LEFT JOIN FETCH i.currentStep
+            LEFT JOIN FETCH i.assignee
+            LEFT JOIN FETCH i.initiatedBy
+            WHERE i.id = :id
+            """)
     Optional<WorkflowInstance> findByIdWithAssigneeAndInitiator(@Param("id") Long id);
 }

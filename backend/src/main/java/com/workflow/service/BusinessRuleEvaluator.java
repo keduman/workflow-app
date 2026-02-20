@@ -3,11 +3,15 @@ package com.workflow.service;
 import com.workflow.model.BusinessRule;
 import com.workflow.model.FormField;
 import com.workflow.model.WorkflowStep;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.ExpressionParser;
 import org.springframework.expression.TypedValue;
+import org.springframework.expression.spel.SpelEvaluationException;
+import org.springframework.expression.spel.SpelParseException;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
-import org.springframework.expression.spel.support.StandardEvaluationContext;
+import org.springframework.expression.spel.support.SimpleEvaluationContext;
 import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -18,11 +22,13 @@ import java.util.Set;
 
 /**
  * Evaluates workflow business rules against submitted form data.
- * Supports condition expressions like "int1 > 5000", "amount <= 1000" using
- * field keys or form field labels as variables.
+ * Uses a sandboxed SpEL context that only allows property access on maps —
+ * no type references, no method calls, no bean references.
  */
 @Component
 public class BusinessRuleEvaluator {
+
+    private static final Logger log = LoggerFactory.getLogger(BusinessRuleEvaluator.class);
 
     private static final ExpressionParser PARSER = new SpelExpressionParser();
     private static final Set<String> BLOCKING_ACTIONS = Set.of("REQUIRE_APPROVAL", "REJECT");
@@ -67,8 +73,7 @@ public class BusinessRuleEvaluator {
 
     private static Object coerceNumber(Object v) {
         if (v instanceof Number) return v;
-        if (v instanceof String) {
-            String s = (String) v;
+        if (v instanceof String s) {
             try {
                 return Long.parseLong(s);
             } catch (NumberFormatException ignored) {}
@@ -82,19 +87,22 @@ public class BusinessRuleEvaluator {
     /**
      * Evaluate all rules. If any rule's condition is true and its action is blocking
      * (REQUIRE_APPROVAL, REJECT), returns that rule's message. Otherwise returns null.
-     * Expressions can use field keys or labels, e.g. "int1 > 5000", "amount <= 1000".
+     * Uses a sandboxed SimpleEvaluationContext — no T() type references, no method calls.
      */
     public String evaluateBlockingRules(List<BusinessRule> rules, Map<String, Object> context) {
         if (rules == null || context == null) return null;
-        StandardEvaluationContext evalContext = new StandardEvaluationContext(context);
-        evalContext.addPropertyAccessor(new MapPropertyAccessor());
+
+        EvaluationContext evalContext = SimpleEvaluationContext
+                .forPropertyAccessors(new MapPropertyAccessor())
+                .build();
+
         for (BusinessRule rule : rules) {
             String expr = rule.getConditionExpression();
             if (expr == null || expr.isBlank() || !BLOCKING_ACTIONS.contains(rule.getActionType())) {
                 continue;
             }
             try {
-                Boolean result = PARSER.parseExpression(expr).getValue(evalContext, Boolean.class);
+                Boolean result = PARSER.parseExpression(expr).getValue(evalContext, context, Boolean.class);
                 if (Boolean.TRUE.equals(result)) {
                     String action = rule.getActionType();
                     String name = rule.getName() != null ? rule.getName() : "Rule";
@@ -105,14 +113,16 @@ public class BusinessRuleEvaluator {
                         return "This submission requires approval (rule: " + name + "). " + (rule.getDescription() != null ? rule.getDescription() : "");
                     }
                 }
-            } catch (Exception ignored) {
-                // Invalid or unsupported expression: skip this rule
+            } catch (SpelParseException e) {
+                log.error("Unparseable business rule expression '{}' on rule '{}': {}", expr, rule.getName(), e.getMessage());
+            } catch (SpelEvaluationException e) {
+                log.warn("Failed to evaluate business rule '{}' with expression '{}': {}", rule.getName(), expr, e.getMessage());
             }
         }
         return null;
     }
 
-    /** Lets SpEL read Map entries as properties (e.g. "int1" when root is a Map). */
+    /** Lets SpEL read Map entries as properties (e.g. "amount" when root is a Map). */
     private static class MapPropertyAccessor implements org.springframework.expression.PropertyAccessor {
         @Override
         public Class<?>[] getSpecificTargetClasses() {
@@ -121,14 +131,13 @@ public class BusinessRuleEvaluator {
 
         @Override
         public boolean canRead(@Nullable EvaluationContext context, @Nullable Object target, String name) {
-            return target instanceof Map && ((Map<?, ?>) target).containsKey(name);
+            return target instanceof Map<?, ?> map && map.containsKey(name);
         }
 
         @Override
         public TypedValue read(@Nullable EvaluationContext context, @Nullable Object target, String name) {
-            if (target instanceof Map) {
-                Object value = ((Map<?, ?>) target).get(name);
-                return new TypedValue(value);
+            if (target instanceof Map<?, ?> map) {
+                return new TypedValue(map.get(name));
             }
             return TypedValue.NULL;
         }

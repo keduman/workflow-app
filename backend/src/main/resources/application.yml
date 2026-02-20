@@ -10,11 +10,15 @@ spring:
     username: ${DB_USER:workflow}
     password: ${DB_PASS:workflow123}
     hikari:
-      maximum-pool-size: 20
-      minimum-idle: 5
+      maximum-pool-size: 10
+      minimum-idle: 2
       idle-timeout: 300000
+      max-lifetime: 1800000
+      connection-timeout: 30000
+      leak-detection-threshold: 15000
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     show-sql: false
@@ -26,6 +30,9 @@ spring:
           batch_size: 25
         order_inserts: true
         order_updates: true
+        query:
+          plan_cache_max_size: 256
+          in_clause_parameter_padding: true
 
   data:
     redis:
@@ -36,6 +43,9 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+
+  data.web.pageable:
+    max-page-size: 100
 
 app:
   jwt:
@@ -50,4 +60,4 @@ app:
   security:
     h2-console-enabled: false
     # Set to true in production so refresh token cookie is Secure (HTTPS only).
-    secure-cookies: false
+    secure-cookies: ${SECURE_COOKIES:true}

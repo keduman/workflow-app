@@ -43,10 +43,6 @@ public class WorkflowService {
     public WorkflowDto getWorkflow(Long id) {
         Workflow workflow = workflowRepository.findWithStepsById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + id));
-        if (workflow.getSteps() != null) {
-            workflow.getSteps().forEach(s -> s.getBusinessRules().size()); // force-init step rules
-        }
-        workflow.getBusinessRules().size(); // force-init legacy workflow-level rules
         return toDto(workflow);
     }
 
@@ -68,10 +64,6 @@ public class WorkflowService {
         if (workflow.getStatus() != WorkflowStatus.PUBLISHED) {
             throw new ResourceNotFoundException("Workflow not found: " + id);
         }
-        if (workflow.getSteps() != null) {
-            workflow.getSteps().forEach(s -> s.getBusinessRules().size()); // force-init step rules
-        }
-        workflow.getBusinessRules().size(); // force-init legacy workflow-level rules
         return toDto(workflow);
     }
 
@@ -82,14 +74,14 @@ public class WorkflowService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         Workflow workflow = Workflow.builder()
-                .name(dto.getName())
-                .description(dto.getDescription())
+                .name(dto.name())
+                .description(dto.description())
                 .status(WorkflowStatus.DRAFT)
                 .createdBy(user)
                 .build();
 
-        if (dto.getSteps() != null) {
-            for (WorkflowStepDto stepDto : dto.getSteps()) {
+        if (dto.steps() != null) {
+            for (WorkflowStepDto stepDto : dto.steps()) {
                 WorkflowStep step = mapStepFromDto(stepDto);
                 workflow.addStep(step);
             }
@@ -105,20 +97,20 @@ public class WorkflowService {
         Workflow workflow = workflowRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow not found: " + id));
 
-        workflow.setName(dto.getName());
-        workflow.setDescription(dto.getDescription());
+        workflow.setName(dto.name());
+        workflow.setDescription(dto.description());
 
-        if (dto.getStatus() != null) {
-            workflow.setStatus(dto.getStatus());
+        if (dto.status() != null) {
+            workflow.setStatus(dto.status());
         }
 
         // Update steps (and their form fields + business rules): clear and rebuild
-        if (dto.getSteps() != null) {
+        if (dto.steps() != null) {
             workflow.getSteps().clear();
-            for (WorkflowStepDto stepDto : dto.getSteps()) {
+            for (WorkflowStepDto stepDto : dto.steps()) {
                 WorkflowStep step = mapStepFromDto(stepDto);
-                if (stepDto.getId() != null) {
-                    step.setId(stepDto.getId());
+                if (stepDto.id() != null) {
+                    step.setId(stepDto.id());
                 }
                 workflow.addStep(step);
             }
@@ -145,49 +137,46 @@ public class WorkflowService {
         if (workflow.getSteps() == null || workflow.getSteps().isEmpty()) {
             throw new BadRequestException("Workflow must have at least one step before publishing");
         }
-        if (workflow.getSteps() != null) {
-            workflow.getSteps().forEach(s -> s.getBusinessRules().size());
-        }
         workflow.setStatus(WorkflowStatus.PUBLISHED);
         return toDto(workflowRepository.save(workflow));
     }
 
     private WorkflowStep mapStepFromDto(WorkflowStepDto dto) {
         WorkflowStep step = WorkflowStep.builder()
-                .name(dto.getName())
-                .description(dto.getDescription())
-                .type(dto.getType() != null ? dto.getType() : StepType.TASK)
-                .stepOrder(dto.getStepOrder() != null ? dto.getStepOrder() : 0)
-                .positionX(dto.getPositionX())
-                .positionY(dto.getPositionY())
-                .transitionTargets(dto.getTransitionTargets())
+                .name(dto.name())
+                .description(dto.description())
+                .type(dto.type() != null ? dto.type() : StepType.TASK)
+                .stepOrder(dto.stepOrder() != null ? dto.stepOrder() : 0)
+                .positionX(dto.positionX())
+                .positionY(dto.positionY())
+                .transitionTargets(dto.transitionTargets())
                 .build();
 
-        if (dto.getAssignedRoleId() != null) {
-            roleRepository.findById(dto.getAssignedRoleId()).ifPresent(step::setAssignedRole);
+        if (dto.assignedRoleId() != null) {
+            roleRepository.findById(dto.assignedRoleId()).ifPresent(step::setAssignedRole);
         }
 
-        if (dto.getFormFields() != null) {
-            for (FormFieldDto fieldDto : dto.getFormFields()) {
+        if (dto.formFields() != null) {
+            for (FormFieldDto fieldDto : dto.formFields()) {
                 FormField field = FormField.builder()
-                        .label(fieldDto.getLabel())
-                        .fieldKey(fieldDto.getFieldKey())
-                        .fieldType(fieldDto.getFieldType() != null ? fieldDto.getFieldType() : FieldType.TEXT)
-                        .required(fieldDto.isRequired())
-                        .placeholder(fieldDto.getPlaceholder())
-                        .options(fieldDto.getOptions())
-                        .validationRegex(fieldDto.getValidationRegex())
-                        .fieldOrder(fieldDto.getFieldOrder() != null ? fieldDto.getFieldOrder() : 0)
+                        .label(fieldDto.label())
+                        .fieldKey(fieldDto.fieldKey())
+                        .fieldType(fieldDto.fieldType() != null ? fieldDto.fieldType() : FieldType.TEXT)
+                        .required(fieldDto.required())
+                        .placeholder(fieldDto.placeholder())
+                        .options(fieldDto.options())
+                        .validationRegex(fieldDto.validationRegex())
+                        .fieldOrder(fieldDto.fieldOrder() != null ? fieldDto.fieldOrder() : 0)
                         .build();
                 step.addFormField(field);
             }
         }
 
-        if (dto.getBusinessRules() != null) {
-            for (BusinessRuleDto ruleDto : dto.getBusinessRules()) {
+        if (dto.businessRules() != null) {
+            for (BusinessRuleDto ruleDto : dto.businessRules()) {
                 BusinessRule rule = mapRuleFromDto(ruleDto);
-                if (ruleDto.getId() != null) {
-                    rule.setId(ruleDto.getId());
+                if (ruleDto.id() != null) {
+                    rule.setId(ruleDto.id());
                 }
                 step.addBusinessRule(rule);
             }
@@ -202,7 +191,7 @@ public class WorkflowService {
                     .collect(Collectors.toMap(WorkflowStep::getId, s -> s, (a, b) -> a, java.util.LinkedHashMap::new))
                     .values().stream()
                     .map(this::stepToDto)
-                    .collect(Collectors.toList())
+                    .toList()
                 : new ArrayList<>();
         // Aggregate all step-level rules for backward compatibility (workflow.businessRules)
         List<BusinessRuleDto> ruleDtos = new ArrayList<>();
@@ -224,76 +213,76 @@ public class WorkflowService {
             }
         }
 
-        return WorkflowDto.builder()
-                .id(workflow.getId())
-                .name(workflow.getName())
-                .description(workflow.getDescription())
-                .status(workflow.getStatus())
-                .createdByUsername(workflow.getCreatedBy() != null ? workflow.getCreatedBy().getUsername() : null)
-                .steps(stepDtos)
-                .businessRules(ruleDtos)
-                .createdAt(workflow.getCreatedAt() != null ? workflow.getCreatedAt().toString() : null)
-                .build();
+        return new WorkflowDto(
+                workflow.getId(),
+                workflow.getName(),
+                workflow.getDescription(),
+                workflow.getStatus(),
+                workflow.getCreatedBy() != null ? workflow.getCreatedBy().getUsername() : null,
+                stepDtos,
+                ruleDtos,
+                workflow.getCreatedAt() != null ? workflow.getCreatedAt().toString() : null
+        );
     }
 
     private BusinessRule mapRuleFromDto(BusinessRuleDto dto) {
         return BusinessRule.builder()
-                .name(dto.getName() != null ? dto.getName() : "Rule")
-                .description(dto.getDescription())
-                .conditionExpression(dto.getConditionExpression())
-                .actionType(dto.getActionType())
-                .targetStepId(dto.getTargetStepId())
-                .ruleOrder(dto.getRuleOrder() != null ? dto.getRuleOrder() : 0)
+                .name(dto.name() != null ? dto.name() : "Rule")
+                .description(dto.description())
+                .conditionExpression(dto.conditionExpression())
+                .actionType(dto.actionType())
+                .targetStepId(dto.targetStepId())
+                .ruleOrder(dto.ruleOrder() != null ? dto.ruleOrder() : 0)
                 .build();
     }
 
     private BusinessRuleDto ruleToDto(BusinessRule rule) {
-        return BusinessRuleDto.builder()
-                .id(rule.getId())
-                .name(rule.getName())
-                .description(rule.getDescription())
-                .conditionExpression(rule.getConditionExpression())
-                .actionType(rule.getActionType())
-                .targetStepId(rule.getTargetStepId())
-                .ruleOrder(rule.getRuleOrder())
-                .build();
+        return new BusinessRuleDto(
+                rule.getId(),
+                rule.getName(),
+                rule.getDescription(),
+                rule.getConditionExpression(),
+                rule.getActionType(),
+                rule.getTargetStepId(),
+                rule.getRuleOrder()
+        );
     }
 
     private WorkflowStepDto stepToDto(WorkflowStep step) {
         List<FormFieldDto> fieldDtos = step.getFormFields() != null
-                ? step.getFormFields().stream().map(this::fieldToDto).collect(Collectors.toList())
+                ? step.getFormFields().stream().map(this::fieldToDto).toList()
                 : new ArrayList<>();
         List<BusinessRuleDto> ruleDtos = step.getBusinessRules() != null
-                ? step.getBusinessRules().stream().map(this::ruleToDto).collect(Collectors.toList())
+                ? step.getBusinessRules().stream().map(this::ruleToDto).toList()
                 : new ArrayList<>();
 
-        return WorkflowStepDto.builder()
-                .id(step.getId())
-                .name(step.getName())
-                .description(step.getDescription())
-                .type(step.getType())
-                .stepOrder(step.getStepOrder())
-                .assignedRoleId(step.getAssignedRole() != null ? step.getAssignedRole().getId() : null)
-                .assignedRoleName(step.getAssignedRole() != null ? step.getAssignedRole().getName() : null)
-                .positionX(step.getPositionX())
-                .positionY(step.getPositionY())
-                .transitionTargets(step.getTransitionTargets())
-                .formFields(fieldDtos)
-                .businessRules(ruleDtos)
-                .build();
+        return new WorkflowStepDto(
+                step.getId(),
+                step.getName(),
+                step.getDescription(),
+                step.getType(),
+                step.getStepOrder(),
+                step.getAssignedRole() != null ? step.getAssignedRole().getId() : null,
+                step.getAssignedRole() != null ? step.getAssignedRole().getName() : null,
+                step.getPositionX(),
+                step.getPositionY(),
+                step.getTransitionTargets(),
+                fieldDtos,
+                ruleDtos
+        );
     }
 
     private FormFieldDto fieldToDto(FormField field) {
-        return FormFieldDto.builder()
-                .id(field.getId())
-                .label(field.getLabel())
-                .fieldKey(field.getFieldKey())
-                .fieldType(field.getFieldType())
-                .required(field.isRequired())
-                .placeholder(field.getPlaceholder())
-                .options(field.getOptions())
-                .validationRegex(field.getValidationRegex())
-                .fieldOrder(field.getFieldOrder())
-                .build();
+        return new FormFieldDto(
+                field.getId(),
+                field.getLabel(),
+                field.getFieldKey(),
+                field.getFieldType(),
+                field.isRequired(),
+                field.getPlaceholder(),
+                field.getOptions(),
+                field.getValidationRegex(),
+                field.getFieldOrder()
+        );
     }
 }
